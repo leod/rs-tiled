@@ -373,7 +373,7 @@ impl ObjectGroup {
 
 #[derive(Debug, PartialEq)]
 pub enum Object {
-     Rect { x: f32,  y: f32,  width: f32,  height: f32,  visible: bool},
+     Rect { x: f32,  y: f32,  width: f32,  height: f32,  visible: bool, type_str: String },
      Ellipse { x: f32,  y: f32,  width: f32,  height: f32,  visible: bool},
      Polyline { x: f32,  y: f32,  points: Vec<(f32, f32)>,  visible: bool},
      Polygon { x: f32,  y: f32,  points: Vec<(f32, f32)>,  visible: bool}
@@ -381,11 +381,12 @@ pub enum Object {
 
 impl Object {
     fn new<R: Read>(parser: &mut EventReader<R>, attrs: Vec<OwnedAttribute>) -> Result<Object, TiledError> {
-        let ((w, h, v), (x, y)) = get_attrs!(
+        let ((w, h, v, t), (x, y)) = get_attrs!(
             attrs,
             optionals: [("width", width, |v:String| v.parse().ok()),
                         ("height", height, |v:String| v.parse().ok()),
-                        ("visible", visible, |v:String| v.parse().ok())],
+                        ("visible", visible, |v:String| v.parse().ok()),
+                        ("type", type_str, |v:String| v.parse().ok())],
             required: [("x", x, |v:String| v.parse().ok()),
                        ("y", y, |v:String| v.parse().ok())],
             TiledError::MalformedAttributes("objects must have an x and a y number".to_string()));
@@ -393,6 +394,7 @@ impl Object {
         let v = v.unwrap_or(true);
         let w = w.unwrap_or(0f32);
         let h = h.unwrap_or(0f32);
+        let t = t.unwrap_or("".to_string());
         parse_tag!(parser, "object",
                    "ellipse" => |_| {
                         obj = Some(Object::Ellipse {x: x, y: y,
@@ -411,7 +413,7 @@ impl Object {
         if obj.is_some() {
             Ok(obj.unwrap())
         } else {
-            Ok(Object::Rect {x: x, y: y, width: w, height: h, visible: v})
+            Ok(Object::Rect {x: x, y: y, width: w, height: h, visible: v, type_str: t })
         }
     }
 
