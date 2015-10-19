@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::io::{BufReader, Read, Error};
 use std::fmt;
 use xml::reader::EventReader;
-use xml::reader::events::XmlEvent::*;
+use xml::reader::XmlEvent::*;
 use xml::attribute::OwnedAttribute;
 use serialize::base64::{FromBase64, FromBase64Error};
 use flate2::read::{ZlibDecoder, GzDecoder};
@@ -53,7 +53,7 @@ macro_rules! parse_tag {
     ($parser:expr, $close_tag:expr, $($open_tag:expr => $open_method:expr),*) => {
         loop {
             match $parser.next() {
-                StartElement {name, attributes, ..} => {
+                Ok(StartElement {name, attributes, ..}) => {
                     if false {}
                     $(else if name.local_name == $open_tag {
                         match $open_method(attributes) {
@@ -62,12 +62,12 @@ macro_rules! parse_tag {
                         };
                     })*
                 }
-                EndElement {name, ..} => {
+                Ok(EndElement {name, ..}) => {
                     if name.local_name == $close_tag {
                         break;
                     }
                 }
-                EndDocument => return Err(TiledError::PrematureEnd("Document ended before we expected.".to_string())),
+                Ok(EndDocument) => return Err(TiledError::PrematureEnd("Document ended before we expected.".to_string())),
                 _ => {}
             }
         }
@@ -484,10 +484,10 @@ fn parse_data<R: Read>(parser: &mut EventReader<R>, attrs: Vec<OwnedAttribute>, 
 fn parse_base64<R: Read>(parser: &mut EventReader<R>) -> Result<Vec<u8>, TiledError> {
     loop {
         match parser.next() {
-            Characters(s) => return s.trim()
-                                    .from_base64()
-                                    .map_err(TiledError::DecodingError),
-            EndElement {name, ..} => {
+            Ok(Characters(s)) => return s.trim()
+                                         .from_base64()
+                                         .map_err(TiledError::DecodingError),
+            Ok(EndElement {name, ..}) => {
                 if name.local_name == "data" {
                     return Ok(Vec::new());
                 }
@@ -523,7 +523,7 @@ fn decode_gzip(data: Vec<u8>) -> Result<Vec<u8>, TiledError> {
 fn decode_csv<R: Read>(parser: &mut EventReader<R>) -> Result<Vec<Vec<u32>>, TiledError> {
     loop {
         match parser.next() {
-            Characters(s) => {
+            Ok(Characters(s)) => {
                 let mut rows: Vec<Vec<u32>> = Vec::new();
                 for row in s.split('\n') {
                     if row.trim() == "" {
@@ -533,7 +533,7 @@ fn decode_csv<R: Read>(parser: &mut EventReader<R>) -> Result<Vec<Vec<u32>>, Til
                 }
                 return Ok(rows);
             }
-            EndElement {name, ..} => {
+            Ok(EndElement {name, ..}) => {
                 if name.local_name == "data" {
                     return Ok(Vec::new());
                 }
@@ -566,12 +566,12 @@ pub fn parse<R: Read>(reader: R) -> Result<Map, TiledError> {
     let mut parser = EventReader::new(reader);
     loop {
         match parser.next() {
-            StartElement {name, attributes, ..}  => {
+            Ok(StartElement {name, attributes, ..})  => {
                 if name.local_name == "map" {
                     return Map::new(&mut parser, attributes);
                 }
             }
-            EndDocument => return Err(TiledError::PrematureEnd("Document ended before map was parsed".to_string())),
+            Ok(EndDocument) => return Err(TiledError::PrematureEnd("Document ended before map was parsed".to_string())),
             _ => {}
         }
     }
